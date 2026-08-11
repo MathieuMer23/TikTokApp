@@ -123,7 +123,12 @@ def tiktok_callback(
             account.scope = token_data["scope"]
             account.token_type = token_data["token_type"]
 
+        print("[TIKTOK] BEFORE COMMIT")
+        print(f"[TIKTOK] open_id = {account.open_id}")
+
         db.commit()
+
+        print("[TIKTOK] AFTER COMMIT")
 
         return {
             "success": True,
