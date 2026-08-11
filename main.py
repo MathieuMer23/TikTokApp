@@ -133,3 +133,28 @@ def tiktok_callback(
 
     finally:
         db.close()
+
+@app.get("/debug/tiktok")
+def debug_tiktok():
+
+    db = SessionLocal()
+
+    try:
+        account = db.query(TikTokAccount).first()
+
+        if account is None:
+            return {
+                "connected": False
+            }
+
+        return {
+            "connected": True,
+            "open_id": account.open_id,
+            "scope": account.scope,
+            "token_type": account.token_type,
+            "has_access_token": bool(account.access_token),
+            "has_refresh_token": bool(account.refresh_token),
+        }
+
+    finally:
+        db.close()
