@@ -5,7 +5,7 @@ import requests
 
 from sqlalchemy.orm import Session
 
-from .models import TikTokAccount
+from model import TikTokAccount
 
 
 TIKTOK_CLIENT_KEY = os.getenv("TIKTOK_CLIENT_KEY")
