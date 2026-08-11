@@ -1,10 +1,16 @@
 import os
 import secrets
+
 import requests
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse
+
 from dotenv import load_dotenv
+
+from app.database import Base, SessionLocal, engine
+from app.model import TikTokAccount
+
 
 load_dotenv()
 
@@ -14,15 +20,16 @@ TIKTOK_CLIENT_KEY = os.getenv("TIKTOK_CLIENT_KEY")
 TIKTOK_CLIENT_SECRET = os.getenv("TIKTOK_CLIENT_SECRET")
 TIKTOK_REDIRECT_URI = os.getenv("TIKTOK_REDIRECT_URI")
 
-# Temporaire : stockage du state en mémoire
 oauth_states = set()
+
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
 def home():
     return {
         "status": "ok",
-        "message": "TikTok automation API is running"
+        "message": "TikTok automation API is running",
     }
 
 
@@ -30,6 +37,7 @@ def home():
 def tiktok_login():
 
     state = secrets.token_urlsafe(32)
+
     oauth_states.add(state)
 
     url = (
@@ -45,25 +53,25 @@ def tiktok_login():
 
 
 @app.get("/auth/tiktok/callback")
-def tiktok_callback(code: str = None, state: str = None):
+def tiktok_callback(
+    code: str | None = None,
+    state: str | None = None,
+):
 
-    # Vérification du state
     if not state or state not in oauth_states:
         raise HTTPException(
             status_code=400,
-            detail="Invalid OAuth state"
+            detail="Invalid OAuth state",
         )
 
-    # Le state ne doit être utilisé qu'une seule fois
     oauth_states.remove(state)
 
     if not code:
         raise HTTPException(
             status_code=400,
-            detail="Missing authorization code"
+            detail="Missing authorization code",
         )
 
-    # Échange du code contre un access token
     response = requests.post(
         "https://open.tiktokapis.com/v2/oauth/token/",
         data={
@@ -79,17 +87,49 @@ def tiktok_callback(code: str = None, state: str = None):
     if response.status_code != 200:
         raise HTTPException(
             status_code=500,
-            detail={
-                "message": "Failed to get access token",
-                "tiktok_response": response.text,
-            },
+            detail="TikTok token exchange failed",
         )
 
     token_data = response.json()
 
-    # Pour le moment on affiche seulement les informations
-    # nécessaires au développement.
-    return {
-        "success": True,
-        "token_data": token_data,
-    }
+    db = SessionLocal()
+
+    try:
+
+        account = db.query(TikTokAccount).filter(
+            TikTokAccount.open_id == token_data["open_id"]
+        ).first()
+
+        if account is None:
+
+            account = TikTokAccount(
+                open_id=token_data["open_id"],
+                access_token=token_data["access_token"],
+                refresh_token=token_data["refresh_token"],
+                expires_in=token_data["expires_in"],
+                refresh_expires_in=token_data["refresh_expires_in"],
+                scope=token_data["scope"],
+                token_type=token_data["token_type"],
+            )
+
+            db.add(account)
+
+        else:
+
+            account.access_token = token_data["access_token"]
+            account.refresh_token = token_data["refresh_token"]
+            account.expires_in = token_data["expires_in"]
+            account.refresh_expires_in = token_data["refresh_expires_in"]
+            account.scope = token_data["scope"]
+            account.token_type = token_data["token_type"]
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "TikTok account connected successfully",
+            "open_id": token_data["open_id"],
+        }
+
+    finally:
+        db.close()
