@@ -1,6 +1,7 @@
 from sqlalchemy import String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
-
+from sqlalchemy import DateTime
+from datetime import datetime
 from .database import Base
 
 
@@ -48,3 +49,8 @@ class TikTokAccount(Base):
         String,
         nullable=False,
     )
+
+    access_token_expires_at: Mapped[datetime] = mapped_column(
+    DateTime,
+    nullable=False,
+)

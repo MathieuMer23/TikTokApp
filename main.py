@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from app.database import Base, SessionLocal, engine
 from app.model import TikTokAccount
-
+from datetime import datetime, timedelta
 
 load_dotenv()
 
@@ -110,6 +110,10 @@ def tiktok_callback(
                 refresh_expires_in=token_data["refresh_expires_in"],
                 scope=token_data["scope"],
                 token_type=token_data["token_type"],
+                access_token_expires_at=(
+                    datetime.utcnow()
+                    + timedelta(seconds=token_data["expires_in"])
+                ),
             )
 
             db.add(account)
@@ -122,6 +126,11 @@ def tiktok_callback(
             account.refresh_expires_in = token_data["refresh_expires_in"]
             account.scope = token_data["scope"]
             account.token_type = token_data["token_type"]
+
+            account.access_token_expires_at = (
+                datetime.utcnow()
+                + timedelta(seconds=token_data["expires_in"])
+            )
 
         print("[TIKTOK] BEFORE COMMIT")
         print(f"[TIKTOK] open_id = {account.open_id}")
